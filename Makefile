@@ -15,5 +15,5 @@ install: man
 	$(INSTALL) -D share/man/man1/iwatch.1 $(DESTDIR)$(PREFIX)/share/man/man1/iwatch.1
 	$(INSTALL) -D share/man/man1/pwatch.1 $(DESTDIR)$(PREFIX)/share/man/man1/iwatch.1
 	$(INSTALL) -D bin/iwatch $(DESTDIR)$(PREFIX)/bin/iwatch
-	$(INSTALL) -D bin/pwatch.1 $(DESTDIR)$(PREFIX)/bin/pwatch
+	$(INSTALL) -D bin/pwatch $(DESTDIR)$(PREFIX)/bin/pwatch
 
