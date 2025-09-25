@@ -5,7 +5,8 @@ iwatch FILES CMD
 ```
 Run `CMD` when one of `FILES` is modified.  If `CMD` is long running, `iwatch`
 will terminate the previous one and wait for it to finish before starting a new
-one.  This is useful for troubleshooting servers.
+one.  This is useful for troubleshooting servers or anything that takes a long
+time to run.
 
 See [iwatch manpage](share/man/man1/iwatch.org) for more info.
 
