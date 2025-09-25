@@ -1,0 +1,45 @@
+#+TITLE: iwatch
+
+* NAME
+
+#+begin_src
+iwatch
+#+end_src
+
+* SYNOPSIS
+
+#+begin_src
+iwatch FILES CMD
+#+end_src
+
+* DESCRIPTION
+
+Run =CMD= every time one of =FILE(s)= is written to.
+
+=FILE(s)=: A comma, space, or newline separated list of files.
+
+=CMD=: Command to run when an event happens.
+
+If =CMD= is long running the previous run of =CMD= is sent the =TERM=
+signal and a new run is started when an event happens.
+
+* CAVEATS
+
+=CMD= is run whenever certain events happen to the watched files so not
+exactly when the file is written to.  Other events are ignored like
+opening the file which happens very frequently if we have an LSP
+running.
+
+* BUGS AND CONTRIBUTIONS
+
+Please submit an issue on [[https://github.com/philippecarphin/iwatch]] or
+submit a merge request with any improvements.
+
+* LORE
+
+Even though I started this using =fswatch= on MacOS, I thought MacOS had
+inodes which is why I called it =iwatch=.  This was a long time ago :).
+
+* AUTHOR
+
+Philippe Carphin

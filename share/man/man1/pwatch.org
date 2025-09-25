@@ -1,0 +1,51 @@
+#+TITLE: iwatch
+
+* NAME
+
+#+begin_src
+pwatch
+#+end_src
+
+* SYNOPSIS
+
+#+begin_src
+iwatch --filespec FILESPEC --cmd CMD [--recursive]
+#+end_src
+
+* DESCRIPTION
+
+Run =CMD= every time one of =FILESPEC= is written to.
+
+=FILESPEC=: A comma, space, or newline separated list of files.
+
+=CMD=: Command to run when an event happens.
+
+If =CMD= is long running the previous run of =CMD= is sent the =TERM=
+signal and a new run is started when an event happens.
+
+* CAVEATS
+
+=CMD= is run whenever certain events happen to the watched files so not
+exactly when the file is written to.  Other events are ignored like
+opening the file which happens very frequently if we have an LSP
+running.
+
+* BUGS AND CONTRIBUTIONS
+
+Please submit an issue on [[https://github.com/philippecarphin/iwatch]] or
+submit a merge request with any improvements.
+
+* LORE
+
+The p is for Python.  I only wrote that version in 2025 because I wanted to
+see if it was going to be easy.  It turned out to be a bit more difficult
+because I had to use threads and flags to make the threads stop.  Still fun
+though.
+
+It turns out that this is still useful because it's easier to pip install
+watchdog than to get fswatch or inotify-tools (although if you're on MacOS,
+you probably own it and can brew install things).
+
+* AUTHOR
+
+Philippe Carphin
