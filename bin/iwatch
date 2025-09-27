@@ -163,6 +163,7 @@ get-watch-cmd(){
     esac
 }
 
+# So I can source the file and test individual functions interactively
 if ! (return 0 2>/dev/null) ; then
     main "$@"
 fi
