@@ -18,12 +18,15 @@ usage(){
 	EOF
 }
 case "$1" in -h|--help) usage ; exit 0 ;; esac
-
+logprefix="\033[38;5;242m${0##*/}:main"
 main(){
     local watch_cmd=$(get-watch-cmd)
 
     local -a files
     get_filenames "$1" ; shift
+    if ((${#files[@]} == 0)) ; then
+        echo "${0##*/}: ERROR: Zero files to watch" >&2
+    fi
 
     local -a cmd=("$@")
     resolve_percent_by_ref cmd
@@ -42,7 +45,7 @@ main(){
 
         # Disregard some events that are triggered too frequently [1]
         case ${event_type} in
-            OPEN) printf "\033[38;5;242m${0}:main: INFO: ignoring event: ${event[*]}\033[0m\n"
+            OPEN) printf "$logprefix: INFO: ignoring event: ${event[*]}\033[0m\n"
                   continue ;;
         esac
 
@@ -69,7 +72,7 @@ run(){
     trap _term SIGTERM
 
     local c="\033[38;5;242m"
-    printf "$c========================================================================\n"
+    printf "$c========================================================================\033[0m\n"
     printf "$c$0: Event: \033[36m%s\033[0m$c, File:\033[35m%s\033[0m\n" "${event_type}" "${event_file}"
     printf "$c$0: Starting command '\033[1m%s\033[0m'\n" "$*"
 
