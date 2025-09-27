@@ -16,12 +16,24 @@ iwatch FILES CMD
 
 Run =CMD= every time one of =FILE(s)= is written to.
 
-=FILE(s)=: A comma, space, or newline separated list of files.
+=FILE(s)=: A comma, space, or newline separated list of files *or* a
+=FILESPEC=.  See FILESPEC below.
 
-=CMD=: Command to run when an event happens.
+=CMD=: Command to run when an event happens.  Inside =CMD=, occurrences of
+=%^= are expanded to the whole list of files and =%=:
+
+#+begin_src sh
+iwatch my_script.py 'python3 %'
+#+end_src
 
 If =CMD= is long running the previous run of =CMD= is sent the =TERM=
 signal and a new run is started when an event happens.
+
+* FILESPEC
+
+If the =FILE= argument starts with =@<path>=, then =iwatch= will watch all files
+tracked by git =<path>= relative to PWD (even if <path> starts with a '/')
+and for =@:<path>=
 
 * CAVEATS
 

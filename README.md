@@ -8,6 +8,10 @@ will terminate the previous one and wait for it to finish before starting a new
 one.  This is useful for troubleshooting servers or anything that takes a long
 time to run.
 
+The `FILES` argument can also be `@...` to ask to watch all files tracked by
+git in a certain directory, and CMD can containt `%` which will be expanded to
+the first file or `%^` which will be expanded to the whole list of files.
+
 See [iwatch manpage](share/man/man1/iwatch.org) for more info.
 
 ## Requirements
@@ -26,7 +30,8 @@ to get the C version if that's easier for you than compiling the Rust version.
 
 # pwatch
 
-Same as `iwatch` but written in Python and
+Same as `iwatch` but written in Python except I didn't do the `@...` for files
+and the `%`, `%^` thing for the command.
 
 See [pwatch manpage](share/man/man1/pwatch.org) for more info.
 
