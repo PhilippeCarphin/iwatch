@@ -124,39 +124,34 @@ resolve_percent_by_ref(){
 }
 
 get_filenames(){
-    # - '@': watch all tracked files in $PWD
-    # - '@a/b' watch all tracked files in $PWD/a/b
-    # - '@:/a/b': Watch all tracked files in ${repo_root}/a/b
-    # - '@:/': Watch all tracked files in repo
-    # - '
-    if [[ "$1" == @ ]] ; then
-        dir=${1#@}
-        if [[ ${dir} == :/* ]] ; then
-            dir=$(git rev-parse --show-toplevel)/${dir#:/}
-        fi
-        echo "${0##*/}: INFO: Watching all tracked files in ${dir}" >&2
-        files=()
+    files=()
+    if [[ "$1" == @* ]] ; then
+        local dir
+        case $1 in
+            @:*) dir=$(git rev-parse --show-toplevel)/${1#@:} ;;
+            @) dir=$PWD/${1#@}
+        esac
+        printf "$logprefix: INFO: Watching all tracked files in ${dir}\033[0m\n" >&2
         while read f ; do
             if [[ -L ${f} ]] ; then
-                echo "${0##*/}: INFO: ... except $f because it is a link" >&2
+                printf "$logprefix: INFO: ... except $f because it is a link\033[0m\n" >&2
                 continue
             fi
             files+=("${f}")
-        done < <(git ls-files ${dir:-.})
-        echo "${0##*/}: INFO: watching '$1' gave ${#files[@]} files" >&2
-        return
+        done < <(git ls-files ${dir})
+        printf "$logprefix: INFO: watching '$1' gave ${#files[@]} files\033[0m\n" >&2
+    else
+        local IFS="${IFS},"
+        files=($1)
+        #
+        # See [1] for why links deserve a warning
+        #
+        for f in "${files[@]}" ; do
+            if [[ -L $f ]] ; then
+                printf "\033[33mWARNING\033[0m: file '$f' is a link\n"
+            fi
+        done
     fi
-
-    local IFS="${IFS},"
-    files=($1)
-    #
-    # See [1] for why links deserve a warning
-    #
-    for f in "${files[@]}" ; do
-        if [[ -L $f ]] ; then
-            printf "\033[33mWARNING\033[0m: file '$f' is a link\n"
-        fi
-    done
 }
 
 get-watch-cmd(){
