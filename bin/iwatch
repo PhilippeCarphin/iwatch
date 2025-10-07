@@ -22,6 +22,12 @@ logprefix="\033[38;5;242m${0##*/}:main"
 main(){
     local watch_cmd=$(get-watch-cmd)
 
+    local resolve_percent=true
+    if [[ "${1}" == --no-percent ]] ; then
+        resolve_percent=false
+        shift
+    fi
+
     local -a files
     get_filenames "$1" ; shift
     if ((${#files[@]} == 0)) ; then
@@ -29,7 +35,9 @@ main(){
     fi
 
     local -a cmd=("$@")
-    resolve_percent_by_ref cmd
+    if ${resolve_percent} ; then
+        resolve_percent_by_ref cmd
+    fi
 
     trap 'if kill -TERM ${run_pid} 2>/dev/null ; then wait ${run_pid} ; fi' EXIT
 
@@ -84,11 +92,11 @@ run(){
 
     if [[ ${caught_term} == 1 ]] ; then
         wait ${child_pid}
-        printf "$c$0: Command '$*' ended by \033[1;33mTERM\033[0m\n"
+        printf "$c$0: Command '%s' ended by \033[1;33mTERM\033[0m\n" "$*"
     elif ! ((exit_code)) ; then
-        printf "$c$0: Command '$*' ended with \033[1;32mSUCCESS\033[0m\n\n"
+        printf "$c$0: Command '%s' ended with \033[1;32mSUCCESS\033[0m\n\n" "$*"
     else
-        printf "$c$0: Command '$*' ended with \033[1;31mERROR: ${exit_code}\033[0m\n\n"
+        printf "$c$0: Command '%s' ended with \033[1;31mERROR: ${exit_code}\033[0m\n\n" "$*"
     fi
 }
 export -f run
