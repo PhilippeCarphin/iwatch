@@ -49,8 +49,7 @@ submit a merge request with any improvements.
 
 * LORE
 
-Even though I started this using =fswatch= on MacOS, I thought MacOS had
-inodes which is why I called it =iwatch=.  This was a long time ago :).
+The 'i' in 'iwatch' is for inodes.
 
 * AUTHOR
 
