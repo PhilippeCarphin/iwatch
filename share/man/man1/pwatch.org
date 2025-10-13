@@ -43,8 +43,7 @@ because I had to use threads and flags to make the threads stop.  Still fun
 though.
 
 It turns out that this is still useful because it's easier to pip install
-watchdog than to get fswatch or inotify-tools (although if you're on MacOS,
-you probably own it and can brew install things).
+watchdog than to get fswatch or inotify-tools.
 
 * AUTHOR
 
