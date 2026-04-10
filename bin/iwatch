@@ -87,6 +87,7 @@ run(){
     printf "$c$0: Event: \033[36m%s\033[0m$c, File:\033[35m%s\033[0m\n" "${event_type}" "${event_file}"
     printf "$c$0: Starting command '\033[1m%s\033[0m'\n" "$*"
 
+    printf "\033[1;32m $ %s\033[m\n" "$*"
     bash -c "$*" &
     child_pid=$!
 
