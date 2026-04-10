@@ -17,7 +17,10 @@ usage(){
 		  running
 	EOF
 }
+
+VERBOSE=true
 case "$1" in -h|--help) usage ; exit 0 ;; esac
+
 logprefix="\033[38;5;242m${0##*/}:main"
 main(){
     local watch_cmd=$(get-watch-cmd)
@@ -53,7 +56,7 @@ main(){
 
         # Disregard some events that are triggered too frequently [1]
         case ${event_type} in
-            OPEN) printf "$logprefix: INFO: ignoring event: ${event[*]}\033[0m\n"
+            OPEN) if ${VERBOSE} ; then printf "$logprefix: INFO: ignoring event: ${event[*]}\033[0m\n" ; fi
                   continue ;;
         esac
 
