@@ -68,7 +68,7 @@ main(){
         run_pid=$!
 
         # Sleep to avoid reacting to groups of events.
-        sleep 0.5
+        sleep 2
     done
 }
 
