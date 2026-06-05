@@ -67,6 +67,8 @@ def wait_for_event(filespec):
 def run(cmd):
     p = subprocess.Popen(['bash', '-c', cmd])
 
+    print(f"\033[38;5;242m{sys.argv[0]}: run: \033[1;32m$ {cmd}\033[0m")
+
     while not STOP_RUN.is_set() and p.poll() is None:
         time.sleep(0.5)
 
