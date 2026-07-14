@@ -21,7 +21,9 @@ install: man
 	$(INSTALL) -D etc/profile.d/iwatch-shell.bash $(DESTDIR)$(PREFIX)/etc/profile.d/iwatch-shell.bash
 
 install-dev: man
-	$(INSTALL) -d localinstall/{bin,share/man/man1,etc/profile.d}
+	$(INSTALL) -d localinstall/bin
+	$(INSTALL) -d localinstall/share/man/man1
+	$(INSTALL) -d localinstall/etc/profile.d
 	ln -snf ../../../../share/man/man1/iwatch.1 	localinstall/share/man/man1/iwatch.1
 	ln -snf ../../../../share/man/man1/pwatch.1 	localinstall/share/man/man1/iwatch.1
 	ln -snf ../../bin/iwatch			localinstall/bin/iwatch
