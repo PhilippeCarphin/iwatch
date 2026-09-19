@@ -2,32 +2,72 @@
 
 * NAME
 
-#+begin_src
-iwatch
-#+end_src
+iwatch - A file monitor that runs a command when events happen
 
 * SYNOPSIS
 
 #+begin_src
-iwatch FILES CMD
+iwatch [options] FILES CMD...
 #+end_src
 
 * DESCRIPTION
 
-Run =CMD= every time one of =FILE(s)= is written to.
+Run =CMD= every time one of =FILE(s)= is written to.  If a previous run of =CMD=
+is still running when an event happens, it is sent the =TERM= signal and waited
+on before starting a new run of =CMD= (this is useful for server type programs).
 
-=FILE(s)=: A comma, space, or newline separated list of files *or* a
-=FILESPEC=.  See FILESPEC below.
+=FILE(s)=: A comma, space, or newline separated list of files *or* a =FILESPEC=.
+The =FILE(s)= argument must be a single argument so either use quotes if
+separating with spaces or newlines, or use commas.  See FILESPEC below.
 
-=CMD=: Command to run when an event happens.  Inside =CMD=, occurrences of
-=%^= are expanded to the whole list of files and =%=:
+=CMD...=: Command to run when an event happens.  Percent signs in =CMD...= are
+resolved to references to one or all of the watched files.  See section =PERCENT
+RESOLUTION=
 
+Note that =CMD...= can be multiple arguments.  All arguments after the =FILE(s)=
+argument are used for the command.
+
+* OPTIONS
+
+** ~-i EVENTS~
+
+Ignore =EVENTS= where =EVENTS= is a comma separated list of event names to ignore.
+
+It can be desirable to ignore certain events.  For example running =git status=
+will cause =OPEN= events on tracked files.
+
+However, some editors only produce =OPEN= events.  In this case, we can run the
+command with =-i ""= so that no event is ignored.
+
+** ~-s SECONDS~
+
+To avoid reacting to groups of events, the main loop of the program sleeps for 2
+seconds before starting to check for new events.
+
+** ~-n~
+
+Disable resolution of percent signs in =CMD...= as described in the =FILESPEC=
+section.
+
+** ~-h~
+
+Print a short help message and exit.
+
+* PERCENT RESOLUTION
+
+Inside =CMD...=, percent signs may be used to refer to the files being watched
+so as to not need to repeat them:
+- =%= expands to the first of the watched files
+- =%^= expands to the complete list of watched files
+for example:
 #+begin_src sh
-iwatch my_script.py 'python3 %'
+iwatch myscript.py python3 %
 #+end_src
-
-If =CMD= is long running the previous run of =CMD= is sent the =TERM=
-signal and a new run is started when an event happens.
+to watch a python script and run it, or
+#+begin_src sh
+iwatch myscript.sh ./%
+#+end_src
+for a shell script.
 
 * FILESPEC
 
