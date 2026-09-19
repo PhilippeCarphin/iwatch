@@ -1,35 +1,51 @@
-#!/usr/bin/env bash
+#!/usr/bin/env -S bash -o errexit -o nounset -o errtrace -o pipefail -O inherit_errexit -O nullglob -O extglob
 
 usage(){
     cat <<-EOF
-		USAGE: $0 FILE(s) CMD
+		USAGE:
+
+		    ${0##*/} [-i EVENTS] [-s SECONDS] [-n] [-h] FILE(s) CMD
 
 		Run CMD every time one of FILE(s) is written to.
 
 		FILE(s): Comma separated list of files
 		CMD: Command to run when an event happens.
+		EVENTS: Comma separated list of events to ignore
+		        Default is \`OPEN\`.
+		        Use \`-i ''\` to ignore nothing
+		SECONDS: Delay in seconds to wait after an event
+		         Default is 2
 
-		- If CMD is long running the previous run of CMD is sent the TERM
-		  signal and a new run is started when an event happens.
-		- CMD is run whenever certain events happen to the watched files so not
-		  exactly when the file is written to.  Other events are ignored like
-		  opening the file which happens very frequently if we have an LSP
-		  running
+		See \`man iwatch\` for more details.
 	EOF
 }
 
-VERBOSE=true
-case "$1" in -h|--help) usage ; exit 0 ;; esac
-
 logprefix="\033[38;5;242m${0##*/}:main"
 main(){
-    local watch_cmd=$(get-watch-cmd)
-
+    local OPTIND OPTARG opt
+    local ignored_events=(OPEN)
+    local sleep_time=2
     local resolve_percent=true
-    if [[ "${1}" == --no-percent ]] ; then
-        resolve_percent=false
-        shift
+    local verbose=false
+    local oifs
+    while getopts "i:s:nhv" opt ; do
+        case ${opt} in
+            i) oifs=${IFS}; IFS=, ; ignored_events=(${OPTARG}) ; IFS=${oifs} ;;
+            s) sleep_time=${OPTARG} ;;
+            n) resolve_percent=false ;;
+            v) verbose=true ;;
+            h) usage ; return 0 ;;
+            '?') return 1 ;;
+        esac
+    done
+    shift $((OPTIND-1))
+
+    if (( $# < 2 )) ; then
+        echo "${0##*/}: ERROR: Two arguments are required (FILE and CMD)" >&2
+        return 1
     fi
+
+    local watch_cmd=$(get-watch-cmd)
 
     local -a files
     get_filenames "$1" ; shift
@@ -42,7 +58,12 @@ main(){
         resolve_percent_by_ref cmd
     fi
 
-    trap 'if kill -TERM ${run_pid} 2>/dev/null ; then wait ${run_pid} ; fi' EXIT
+    if ${verbose} ; then
+        declare -p files
+        declare -p cmd
+    fi
+
+    trap 'if [[ -n ${run_pid:-} ]] ; then if kill -TERM ${run_pid} 2>/dev/null ; then wait ${run_pid} ; fi ; fi' EXIT
 
     export event_type event_file # Need to be available for the child process
 
@@ -55,20 +76,24 @@ main(){
         event_type=${event[1]}
 
         # Disregard some events that are triggered too frequently [1]
-        case ${event_type} in
-            OPEN) if ${VERBOSE} ; then printf "$logprefix: INFO: ignoring event: ${event[*]}\033[0m\n" ; fi
-                  continue ;;
-        esac
+        for e in "${ignored_events[@]}" ; do
+            if [[ ${event_type} == "${e}" ]] ; then
+                printf "$logprefix: INFO: ignoring event: ${event[*]}\033[0m\n"
+                continue 2
+            fi
+        done
 
         # Kill previous invocation of CMD if there is one and wait for it to finish
-        if kill ${run_pid} 2>/dev/null ; then wait ${run_pid} ; fi
+        if [[ -n ${run_pid:-} ]] ; then
+            if kill ${run_pid} 2>/dev/null ; then wait ${run_pid} ; fi
+        fi
 
         # Start next run and note it's PID
         bash -c 'run "$@"' "${0##*/}:run-handler" "${cmd[@]}" &
         run_pid=$!
 
         # Sleep to avoid reacting to groups of events.
-        sleep 2
+        sleep ${sleep_time}
     done
 }
 
@@ -125,45 +150,55 @@ watch_cmd_mac(){
 # as a redirection) while '%' and '%^' work outside of quotes.
 #
 resolve_percent_by_ref(){
+    # declare -p files
+    # local all_files="${files[*]}"
+    # echo "all files: ${all_files}"
     local -n _to_resolve=$1
     local i e
     for i in ${!_to_resolve[@]} ; do
         e=${_to_resolve[i]}
         e=${e//%^/${files[*]}}
+        e=${e//%</${files[0]}}
         e=${e//%/${files[0]}}
         _to_resolve[i]=${e}
     done
 }
 
 get_filenames(){
+    local filespecs
+    local IFS=${IFS}
+    IFS=, filespecs=($1)
+    declare -p filespecs
     files=()
-    if [[ "$1" == @* ]] ; then
-        local dir
-        case $1 in
-            @:*) dir=$(git rev-parse --show-toplevel)/${1#@:} ;;
-            @) dir=$PWD/${1#@}
-        esac
-        printf "$logprefix: INFO: Watching all tracked files in ${dir}\033[0m\n" >&2
-        while read f ; do
-            if [[ -L ${f} ]] ; then
-                printf "$logprefix: INFO: ... except $f because it is a link\033[0m\n" >&2
-                continue
-            fi
-            files+=("${f}")
-        done < <(git ls-files ${dir})
-        printf "$logprefix: INFO: watching '$1' gave ${#files[@]} files\033[0m\n" >&2
-    else
-        local IFS="${IFS},"
-        files=($1)
-        #
-        # See [1] for why links deserve a warning
-        #
-        for f in "${files[@]}" ; do
-            if [[ -L $f ]] ; then
-                printf "\033[33mWARNING\033[0m: file '$f' is a link\n"
-            fi
-        done
-    fi
+    for fs in "${filespecs[@]}" ; do
+        if [[ "$fs" == @* ]] ; then
+            local dir
+            case $fs in
+                @:*) dir=$(git rev-parse --show-toplevel)/${1#@:} ;;
+                @) dir=$PWD/${fs#@}
+            esac
+            printf "$logprefix: INFO: Watching all tracked files in ${dir}\033[0m\n" >&2
+            while read f ; do
+                if [[ -L ${f} ]] ; then
+                    printf "$logprefix: INFO: ... except $f because it is a link\033[0m\n" >&2
+                    continue
+                fi
+                files+=("${f}")
+            done < <(git ls-files ${dir})
+            printf "$logprefix: INFO: watching '$1' gave ${#files[@]} files\033[0m\n" >&2
+        else
+            local IFS="${IFS},"
+            files+=($fs)
+            #
+            # See [1] for why links deserve a warning
+            #
+            for f in "${files[@]}" ; do
+                if [[ -L $f ]] ; then
+                    printf "\033[33mWARNING\033[0m: file '$f' is a link\n"
+                fi
+            done
+        fi
+    done
 }
 
 get-watch-cmd(){
