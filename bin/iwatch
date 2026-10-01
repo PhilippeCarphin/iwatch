@@ -167,7 +167,7 @@ resolve_percent_by_ref(){
 get_filenames(){
     local filespecs
     local IFS=${IFS}
-    IFS=, filespecs=($1)
+    IFS=${IFS}, filespecs=($1)
     declare -p filespecs
     files=()
     for fs in "${filespecs[@]}" ; do
