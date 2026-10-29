@@ -4,7 +4,7 @@ usage(){
     cat <<-EOF
 		USAGE:
 
-		    ${0##*/} [-i EVENTS] [-s SECONDS] [-n] [-h] FILE(s) CMD
+		    ${0##*/} [t TMUX-SCRIPT:PANE] [-i EVENTS] [-s SECONDS] [-n] [-h] FILE(s) CMD
 
 		Run CMD every time one of FILE(s) is written to.
 
@@ -15,6 +15,8 @@ usage(){
 		        Use \`-i ''\` to ignore nothing
 		SECONDS: Delay in seconds to wait after an event
 		         Default is 2
+
+        TMUX-FILE: A file format that I invented.  See run-tmux-file() below
 
 		See \`man iwatch\` for more details.
 	EOF
@@ -27,13 +29,16 @@ main(){
     local sleep_time=2
     local resolve_percent=true
     local verbose=false
+    local tmux_file=""
+    local tmux_target_pane=""
     local oifs
-    while getopts "i:s:nhv" opt ; do
+    while getopts "t:i:s:nhv" opt ; do
         case ${opt} in
             i) oifs=${IFS}; IFS=, ; ignored_events=(${OPTARG}) ; IFS=${oifs} ;;
             s) sleep_time=${OPTARG} ;;
             n) resolve_percent=false ;;
             v) verbose=true ;;
+            t) tmux_file=${OPTARG%:*} ; tmux_target_pane=${OPTARG#*:} ;;
             h) usage ; return 0 ;;
             '?') return 1 ;;
         esac
@@ -53,9 +58,23 @@ main(){
         echo "${0##*/}: ERROR: Zero files to watch" >&2
     fi
 
-    local -a cmd=("$@")
-    if ${resolve_percent} ; then
-        resolve_percent_by_ref cmd
+    if [[ -n ${tmux_file} ]] ; then
+        if [[ $tmux_file == - ]] ; then
+            if tmp_tmux_file=$(mktemp) ; then
+                trap "rm ${tmux_file}" EXIT
+                cat >> ${tmp_tmux_file}
+                tmux_file=${tmp_tmux_file}
+            else
+                echo "Could not create tempfile for tmux commands" >&2
+                exit 1
+            fi
+        fi
+        echo "tmux_file=${tmux_file}, tmux_target_pane=${tmux_target_pane}" >&2
+    else
+        local -a cmd=("$@")
+        if ${resolve_percent} ; then
+            resolve_percent_by_ref cmd
+        fi
     fi
 
     if ${verbose} ; then
@@ -89,8 +108,12 @@ main(){
         fi
 
         # Start next run and note it's PID
-        bash -c 'run "$@"' "${0##*/}:run-handler" "${cmd[@]}" &
-        run_pid=$!
+        if [[ -n ${tmux_file} ]] ; then
+            run-tmux-file "${tmux_target_pane}" "${tmux_file}"
+        else
+            bash -c 'run "$@"' "${0##*/}:run-handler" "${cmd[@]}" &
+            run_pid=$!
+        fi
 
         # Sleep to avoid reacting to groups of events.
         sleep ${sleep_time}
@@ -208,6 +231,43 @@ get-watch-cmd(){
         Linux)  echo watch_cmd_linux ;;
         *) echo "Unknown operating system : ${os}" ; exit 1 ;;
     esac
+}
+
+run-tmux-file(){
+    local target_pane=$1
+    local file=$2
+    while read -r line ; do
+        case $line in
+            @@*) tmux send-keys -t ${target_pane} ${line#@} ;;
+            \#*) do-the-thing "$line" ;;
+            @*) ${line#@} ;;
+            *) tmux send-keys -t ${target_pane} ${line} ;;
+        esac
+    done < $2
+}
+
+do-the-thing(){
+    first_word=${1%% *}
+    number=${first_word#\#}
+    rest=${1#* }
+    for((i=0;i<${#rest};i++)) ; do
+        local c="${rest:i:1}"
+        case "$c" in
+            ' ') c=Space ;;
+            $'\t') c=Tab ;;
+            "\\") c=${rest: ++i:1}
+                echo "Backslash (d=$c)"
+                case ${c} in
+                    t) c=Tab ;;
+                    n) c=Enter ;;
+                    "\\") c=Backslash ;;
+                    *) echo "Unhandled escape sequence \"\\${c}\"" >&2
+                        c="\\${c}" ;;
+                esac
+        esac
+        tmux send-keys -t ${target_pane} ${c}
+        sleep ${number}
+    done
 }
 
 # So I can source the file and test individual functions interactively
