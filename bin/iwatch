@@ -29,8 +29,7 @@ main(){
     local sleep_time=2
     local resolve_percent=true
     local verbose=false
-    local tmux_file=""
-    local tmux_target_pane=""
+    local tmux_arg=""
     local oifs
     while getopts "t:i:s:nhv" opt ; do
         case ${opt} in
@@ -38,7 +37,7 @@ main(){
             s) sleep_time=${OPTARG} ;;
             n) resolve_percent=false ;;
             v) verbose=true ;;
-            t) tmux_file=${OPTARG%:*} ; tmux_target_pane=${OPTARG#*:} ;;
+            t) tmux_arg=${OPTARG} ;;
             h) usage ; return 0 ;;
             '?') return 1 ;;
         esac
@@ -58,19 +57,7 @@ main(){
         echo "${0##*/}: ERROR: Zero files to watch" >&2
     fi
 
-    if [[ -n ${tmux_file} ]] ; then
-        if [[ $tmux_file == - ]] ; then
-            if tmp_tmux_file=$(mktemp) ; then
-                trap "rm ${tmux_file}" EXIT
-                cat >> ${tmp_tmux_file}
-                tmux_file=${tmp_tmux_file}
-            else
-                echo "Could not create tempfile for tmux commands" >&2
-                exit 1
-            fi
-        fi
-        echo "tmux_file=${tmux_file}, tmux_target_pane=${tmux_target_pane}" >&2
-    else
+    if [[ -z ${tmux_arg} ]] ; then
         local -a cmd=("$@")
         if ${resolve_percent} ; then
             resolve_percent_by_ref cmd
@@ -92,7 +79,7 @@ main(){
             exit 1
         fi
         event_file=${event[0]}
-        event_type=${event[1]}
+        event_type=${event[1]:-xxx}
 
         # Disregard some events that are triggered too frequently [1]
         for e in "${ignored_events[@]}" ; do
@@ -108,8 +95,8 @@ main(){
         fi
 
         # Start next run and note it's PID
-        if [[ -n ${tmux_file} ]] ; then
-            run-tmux-file "${tmux_target_pane}" "${tmux_file}"
+        if [[ -n ${tmux_arg} ]] ; then
+            run-tmux-file "${tmux_arg}"
         else
             bash -c 'run "$@"' "${0##*/}:run-handler" "${cmd[@]}" &
             run_pid=$!
@@ -234,16 +221,47 @@ get-watch-cmd(){
 }
 
 run-tmux-file(){
-    local target_pane=$1
-    local file=$2
-    while read -r line ; do
-        case $line in
-            @@*) tmux send-keys -t ${target_pane} ${line#@} ;;
-            \#*) do-the-thing "$line" ;;
-            @*) ${line#@} ;;
-            *) tmux send-keys -t ${target_pane} ${line} ;;
-        esac
-    done < $2
+    local tmux_file target_pane
+    if [[ $1 == *:* ]] ; then
+        tmux_file=${1#:*}
+        target_pane=${1%%*:}
+    else
+        tmux_file=${1}
+        target_pane=""
+    fi
+
+    local tmpfile
+    if [[ $tmux_file == - ]] ; then
+        if ! tmux_file=$(mktemp) ; then
+            echo "Reading stdin for tmux, could not create tmpfile" >&2
+            exit 1
+        else
+            cat >> ${tmux_file}
+            trap "rm -f '${tmux_file}'" EXIT
+        fi
+    fi
+
+    echo "${FUNCNAME[0]}: Doing tmux_file=${tmux_file}, target_pane='${target_pane}'" >&2
+    if [[ -n ${target_pane} ]] ; then
+        while read -r line ; do
+            case $line in
+                @@*) tmux send-keys -t ${target_pane} ${line#@} ;;
+                \#*) do-the-thing "$line" ;;
+                @*) ${line#@} ;;
+                *) tmux send-keys -t ${target_pane} ${line} ;;
+            esac
+        done <${tmux_file}
+    else
+        local c line
+        set -x
+        while read -r c line ; do
+            case $c in
+                @*) tmux send-keys -t ${c#@} $line ;;
+                \#) ${line} ;;
+                *) echo "Unhandled line '${c} ${line}'" >&2 ;;
+            esac
+        done <${tmux_file}
+    fi
 }
 
 do-the-thing(){
