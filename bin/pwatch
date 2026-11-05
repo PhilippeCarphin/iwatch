@@ -29,16 +29,19 @@ def main():
     signal.signal(signal.SIGTERM, stop_program)
 
     args = get_args()
-
-    t = None
-    while wait_for_event(args.filespec) and not STOP_PROGRAM.is_set():
-        if t and t.is_alive():
-            print(f"\033[38;5;242m{sys.argv[0]}: stopping previous run\033[0m")
-            STOP_RUN.set()
-            t.join()
+    while True:
         print(f"\033[38;5;242m{sys.argv[0]}: ======================================\033[0m")
         t = threading.Thread(target=run, args=(args.cmd,))
         t.start()
+
+        wait_for_event(args.filespec)
+        if t.is_alive():
+            print(f"\033[38;5;242m{sys.argv[0]}: stopping previous run\033[0m")
+            STOP_RUN.set()
+            t.join()
+
+        if STOP_PROGRAM.is_set():
+            break;
 
 class EventHandler:
     def __init__(self, observer):
