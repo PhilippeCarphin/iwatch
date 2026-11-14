@@ -24,4 +24,4 @@ install-dev: man
 	ln -snf $(PWD)/bin/iwatch                      $(DESTDIR)$(PREFIX)/bin/iwatch
 	ln -snf $(PWD)/bin/pwatch                      $(DESTDIR)$(PREFIX)/bin/pwatch
 	ln -snf $(PWD)/share/man/man1/iwatch.1         $(DESTDIR)$(PREFIX)/share/man/man1/iwatch.1
-	ln -snf $(PWD)/share/man/man1/pwatch.1         $(DESTDIR)$(PREFIX)/share/man/man1/iwatch.1
+	ln -snf $(PWD)/share/man/man1/pwatch.1         $(DESTDIR)$(PREFIX)/share/man/man1/pwatch.1
