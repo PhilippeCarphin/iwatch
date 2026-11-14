@@ -29,7 +29,7 @@ main(){
     local sleep_time=2
     local resolve_percent=true
     local verbose=false
-    local tmux_arg=""
+    local tmux_file=""
     local oifs
     while getopts "t:i:s:nhv" opt ; do
         case ${opt} in
@@ -37,7 +37,7 @@ main(){
             s) sleep_time=${OPTARG} ;;
             n) resolve_percent=false ;;
             v) verbose=true ;;
-            t) tmux_arg=${OPTARG} ;;
+            t) tmux_file=${OPTARG} ;;
             h) usage ; return 0 ;;
             '?') return 1 ;;
         esac
@@ -52,14 +52,7 @@ main(){
         echo "${0##*/}: ERROR: Zero files to watch" >&2
     fi
 
-    if [[ -n ${tmux_arg:-} ]] ; then
-        if [[ ${tmux_arg} == *:* ]] ; then
-            tmux_file=${tmux_arg%:*}
-            target_pane=${tmux_arg##*:}
-        else
-            tmux_file=${tmux_arg}
-            target_pane=""
-        fi
+    if [[ -n ${tmux_file:-} ]] ; then
         if [[ $tmux_file == - ]] ; then
             if ! tmux_file=$(mktemp) ; then
                 echo "Reading stdin for tmux, could not create tmpfile" >&2
@@ -113,8 +106,8 @@ main(){
         fi
 
         # Start next run and note it's PID
-        if [[ -n ${tmux_arg} ]] ; then
-            run-tmux-file "${tmux_file}" "${target_pane}"
+        if [[ -n ${tmux_file} ]] ; then
+            run-tmux-file "${tmux_file}"
         else
             bash -c 'run "$@"' "${0##*/}:run-handler" "${cmd[@]}" &
             run_pid=$!
@@ -259,42 +252,35 @@ get-watch-cmd(){
 }
 
 run-tmux-file(){
-    local tmux_file=$1 target_pane=$2
+    local tmux_file=$1
 
-    echo "${FUNCNAME[0]}: Doing tmux_file=${tmux_file}, target_pane='${target_pane}'" >&2
-    if [[ -n ${target_pane} ]] ; then
-        while read -r line ; do
-            case $line in
-                @@*) tmux send-keys -t ${target_pane} ${line#@} ;;
-                \#*) do-the-thing "$line" ;;
-                @*) ${line#@} ;;
-                *) tmux send-keys -t ${target_pane} ${line} ;;
-            esac
-        done <${tmux_file}
-    else
-        local c line
-        set -x
-        while read -r c line ; do
-            case $c in
-                @*) tmux send-keys -t ${c#@} $line ;;
-                \#) ${line} ;;
-                *) echo "Unhandled line '${c} ${line}'" >&2 ;;
-            esac
-        done <${tmux_file}
-    fi
+    echo "${FUNCNAME[0]}: Doing tmux_file=${tmux_file}" >&2
+    local default_target_pane=None
+    local default_typing_speed=0.05
+    while read -r pfx line ; do
+        case $pfx in
+            '>>') default_target_pane=${line} ;;
+            %%) default_typing_speed=${line} ;;
+            \#*) continue ;;
+            '!!')      ${line} ;;
+            @[0-9]*) tmux send-keys -t ${pfx#@} ${line} ;;
+            @@)      tmux send-keys -t ${default_target_pane} ${line} ;;
+            '&'[0-9]*) rtf-type-keys "${pfx#&}" "${line}" ;;
+            '&&')      rtf-type-keys "${default_target_pane}" "${line}" ;;
+            *)         rtf-type-keys ${default_target_pane} "${pfx}${line:+ ${line}}" ;;
+        esac
+    done <${tmux_file}
 }
 
-do-the-thing(){
-    first_word=${1%% *}
-    number=${first_word#\#}
-    rest=${1#* }
-    for((i=0;i<${#rest};i++)) ; do
-        local c="${rest:i:1}"
+rtf-type-keys(){
+    local target_pane=$1
+    local keys=$2
+    for((i=0;i<${#keys};i++)) ; do
+        local c="${keys:i:1}"
         case "$c" in
             ' ') c=Space ;;
             $'\t') c=Tab ;;
-            "\\") c=${rest: ++i:1}
-                echo "Backslash (d=$c)"
+            "\\") c=${keys: ++i:1}
                 case ${c} in
                     t) c=Tab ;;
                     n) c=Enter ;;
@@ -304,7 +290,7 @@ do-the-thing(){
                 esac
         esac
         tmux send-keys -t ${target_pane} ${c}
-        sleep ${number}
+        sleep ${default_typing_speed}
     done
 }
 
