@@ -95,15 +95,17 @@ main(){
             exit 1
         fi
         event_file=${event[0]}
-        event_type=${event[1]:-xxx}
+        event_type=${event[1]:-} # MacOS fswatch doesn't give event types hence the ${...:-} to not trigger nounset+errexit
+        local oifs=${IFS}
+        IFS=','
+        local event_types=(${event_type})
+        IFS=${oifs}
 
         # Disregard some events that are triggered too frequently [1]
-        for e in "${ignored_events[@]}" ; do
-            if [[ ${event_type} == "${e}" ]] ; then
-                printf "$logprefix: INFO: ignoring event: ${event[*]}\033[0m\n"
-                continue 2
-            fi
-        done
+        if contains_only_ignored_events_by_ref event_types ignored_events ; then
+            printf "$logprefix: INFO: ignoring event(s): ${event[*]}\033[0m\n"
+            continue
+        fi
 
         # Kill previous invocation of CMD if there is one and wait for it to finish
         if [[ -n ${run_pid:-} ]] ; then
@@ -168,6 +170,26 @@ watch_cmd_mac(){
     fswatch -1 "$@"
 }
 
+contains_only_ignored_events_by_ref(){
+    local -n _received_event_types=$1
+    local -n _ignored_event_types=$2
+    local t ign
+    for t in "${_received_event_types}"; do
+        if ! is_ignored $t ; then
+            return 1 # One of the events is not ignored
+        fi
+    done
+    return 0 # All received events are ignored
+}
+is_ignored(){
+    local t=$1
+    for ign in "${_ignored_event_types[@]}" ; do
+        if [[ "${ign}" == "${t}" ]] ; then
+            return 0 # Event t is ignored
+        fi
+    done
+    return 1 # t was not equal to any ignored event type
+}
 #
 # Change elements of array by replacing '%^' by the list of files and '%' by
 # the first file.  This is inspired by $^ (whole dependency list) and '$<'
