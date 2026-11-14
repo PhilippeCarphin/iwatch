@@ -44,11 +44,6 @@ main(){
     done
     shift $((OPTIND-1))
 
-    if (( $# < 2 )) ; then
-        echo "${0##*/}: ERROR: Two arguments are required (FILE and CMD)" >&2
-        return 1
-    fi
-
     local watch_cmd=$(get-watch-cmd)
 
     local -a files
@@ -57,7 +52,28 @@ main(){
         echo "${0##*/}: ERROR: Zero files to watch" >&2
     fi
 
-    if [[ -z ${tmux_arg} ]] ; then
+    if [[ -n ${tmux_arg:-} ]] ; then
+        if [[ ${tmux_arg} == *:* ]] ; then
+            tmux_file=${tmux_arg%:*}
+            target_pane=${tmux_arg##*:}
+        else
+            tmux_file=${tmux_arg}
+            target_pane=""
+        fi
+        if [[ $tmux_file == - ]] ; then
+            if ! tmux_file=$(mktemp) ; then
+                echo "Reading stdin for tmux, could not create tmpfile" >&2
+                exit 1
+            else
+                cat >> ${tmux_file}
+                trap "rm -f '${tmux_file}'" EXIT
+            fi
+        fi
+    else
+        if (( $# < 2 )) ; then
+            echo "${0##*/}: ERROR: \`iwatch [options] FILE CMD\` or \`iwatch -t TMUX_ARG FILE\`" >&2
+            return 1
+        fi
         local -a cmd=("$@")
         if ${resolve_percent} ; then
             resolve_percent_by_ref cmd
@@ -96,7 +112,7 @@ main(){
 
         # Start next run and note it's PID
         if [[ -n ${tmux_arg} ]] ; then
-            run-tmux-file "${tmux_arg}"
+            run-tmux-file "${tmux_file}" "${target_pane}"
         else
             bash -c 'run "$@"' "${0##*/}:run-handler" "${cmd[@]}" &
             run_pid=$!
@@ -221,25 +237,7 @@ get-watch-cmd(){
 }
 
 run-tmux-file(){
-    local tmux_file target_pane
-    if [[ $1 == *:* ]] ; then
-        tmux_file=${1#:*}
-        target_pane=${1%%*:}
-    else
-        tmux_file=${1}
-        target_pane=""
-    fi
-
-    local tmpfile
-    if [[ $tmux_file == - ]] ; then
-        if ! tmux_file=$(mktemp) ; then
-            echo "Reading stdin for tmux, could not create tmpfile" >&2
-            exit 1
-        else
-            cat >> ${tmux_file}
-            trap "rm -f '${tmux_file}'" EXIT
-        fi
-    fi
+    local tmux_file=$1 target_pane=$2
 
     echo "${FUNCNAME[0]}: Doing tmux_file=${tmux_file}, target_pane='${target_pane}'" >&2
     if [[ -n ${target_pane} ]] ; then
